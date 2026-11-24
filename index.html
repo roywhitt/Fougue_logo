@@ -7,20 +7,28 @@
 :root{color-scheme:light dark}
 html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 canvas{display:block;width:100vw;height:100vh;touch-action:pan-y}
-#ui{position:fixed;top:6px;left:6px;display:flex;gap:5px;opacity:0;transition:opacity .4s}
-body:hover #ui{opacity:.35} #ui:hover{opacity:.95!important}
-#ui button{all:unset;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+#ui{position:fixed;top:6px;left:6px;display:flex;align-items:center;gap:6px;opacity:0;transition:opacity .35s}
+body:hover #ui{opacity:.4} #ui:hover,body.toy #ui{opacity:1!important}
+#ui button{all:unset;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#1d1d1b;
+  transition:transform .18s cubic-bezier(.3,1.6,.5,1),background .18s,color .18s,box-shadow .18s}
+body.dk #ui button{color:#e8e6e1}
 #ui button svg{width:14px;height:14px}
-#ui button{color:#1d1d1b} body.dk #ui button{color:#e8e6e1}
-#bTreat{cursor:grab;touch-action:none}
-#bColor span{width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 1.5px currentColor}
+#ui button:hover,#ui button.on{transform:scale(1.35);color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,transparent);box-shadow:0 0 0 1.5px color-mix(in srgb,var(--acc) 55%,transparent)}
+#ui button:active{transform:scale(1.15)}
+#bTreat,#bToy{cursor:grab;touch-action:none}
+#bColor span{width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 1.5px currentColor;transition:transform .18s}
+#bColor:hover span{transform:scale(1.2)}
+#lab{font:500 10.5px/1 "Inter Tight",Inter,system-ui,sans-serif;letter-spacing:.01em;color:var(--acc);margin-left:4px;white-space:nowrap;opacity:0;transform:translateX(-4px);transition:opacity .18s,transform .18s;pointer-events:none}
+#lab.show{opacity:1;transform:none}
 #ghost{position:fixed;display:none;pointer-events:none;width:30px;height:16px;margin:-8px 0 0 -15px}
 </style></head><body>
 <canvas id="c"></canvas>
 <div id="ui">
-  <button id="bTreat" title="Friandise : glisse-la au-dessus du renard"><svg viewBox="-16 -14 32 22"><path d="M-11 -3 C-15 -9 -7 -12 -6 -5 L6 -5 C7 -12 15 -9 11 -3 C15 3 7 6 6 0 L-6 0 C-7 6 -15 3 -11 -3 Z" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button>
-  <button id="bColor" title="Couleur"><span></span></button>
-  <button id="bTheme" title="Clair / sombre"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></button>
+  <button id="bTreat"><svg viewBox="-16 -14 32 22"><path d="M-11 -3 C-15 -9 -7 -12 -6 -5 L6 -5 C7 -12 15 -9 11 -3 C15 3 7 6 6 0 L-6 0 C-7 6 -15 3 -11 -3 Z" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button>
+  <button id="bToy"><svg viewBox="0 0 16 16"><path d="M2 2 L7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7 7 Q8 12 11 11.5" fill="none" stroke="currentColor" stroke-width="1"/><circle cx="12" cy="11.5" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
+  <button id="bColor"><span></span></button>
+  <button id="bTheme"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></button>
+  <span id="lab"></span>
 </div>
 <svg id="ghost" viewBox="-16 -14 32 22"><path d="M-11 -3 C-15 -9 -7 -12 -6 -5 L6 -5 C7 -12 15 -9 11 -3 C15 3 7 6 6 0 L-6 0 C-7 6 -15 3 -11 -3 Z" fill="#1d1d1b" stroke="#b18aff" stroke-width="2.4"/></svg>
 <script>
@@ -99,7 +107,12 @@ let mode = Q.get('theme') || store.get('fougue_theme', matchMedia('(prefers-colo
 let colorIx = +store.get('fougue_color', 0) % COLORS.length, ACC = COLORS[colorIx];
 const STK = () => mode === 'dark' ? '#0c0c0c' : '#1d1d1b', LINING = '#3a3a3a';
 if (Q.get('theme')) document.documentElement.style.colorScheme = Q.get('theme');
-function applyUI(){ document.body.classList.toggle('dk', mode === 'dark'); document.getElementById('bColor').style.setProperty('--acc', ACC); }
+function applyUI(){ document.body.classList.toggle('dk', mode === 'dark'); document.body.style.setProperty('--acc', ACC);
+  const l = document.getElementById('lab'); if (l && l.dataset.for === 'bTheme') l.textContent = mode === 'dark' ? 'mode clair' : 'mode sombre'; }
+const LABELS = { bTreat: 'friandise · glisse-la', bToy: 'jouet · maintiens le clic', bColor: 'couleur', bTheme: () => mode === 'dark' ? 'mode clair' : 'mode sombre' };
+for (const id in LABELS){ const el = document.getElementById(id);
+  el.addEventListener('pointerenter', () => { const l = document.getElementById('lab'); l.dataset.for = id; l.textContent = typeof LABELS[id] === 'function' ? LABELS[id]() : LABELS[id]; l.classList.add('show'); });
+  el.addEventListener('pointerleave', () => document.getElementById('lab').classList.remove('show')); }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), lerp = (a, b, k) => a + (b - a) * k, rnd = (a, b) => a + Math.random() * (b - a);
 function hourNow(){
   if (T_Q){ const [h, m] = T_Q.split(':').map(Number); return (h + (m || 0) / 60 + performance.now() / 3.6e6 * SPEED) % 24; }
@@ -216,6 +229,7 @@ function start(name, opt = {}){
     case 'dodo': A.d = rnd(25, 60); break;
     case 'mange': A.d = 3.2; break;
     case 'caresse': A.d = 99; break;
+    case 'joue': A.d = 99; A.cool = 0; break;
   }
 }
 function next(){
@@ -284,7 +298,57 @@ function targetPose(t, dt){
     p = add(P.logo, { a: [0, 0, 0, 0, 0, sway * .4, Math.sin(t * 1.3 + .5) * 3, Math.sin(t * 1.3 + 1) * 3, Math.sin(t * 1.3 + 1.5) * 3] });
     if (fox.actT >= A.d) start('regarde', { d: .1 });
   } else if (k === 'quitte'){ p = fox.actT < A.fly * .5 ? P.saut : P.debout; }
+  else if (k === 'joue'){
+    // il suit la balle, se met en position de jeu quand elle est proche, et bondit pour l'attraper
+    A.cool = Math.max(0, A.cool - dt);
+    const dir = toy.bx < fox.x ? 1 : -1, reach = 330 * s, want = toy.bx + dir * reach * .9;
+    const [lo, hi] = range(dir), tx = clamp(want, lo, hi), d = tx - fox.x, air = fox.h > 2 * s;
+    if (!air && Math.abs(d) > 30 * s){ fox.dir = dir; const sp = (Math.abs(d) > 220 * s ? 1050 : 420) * s;
+      fox.x += Math.sign(d) * Math.min(Math.abs(d), sp * dt);
+      if (Math.abs(d) > 220 * s){ fox.ph += dt * 13; const kk = (1 + Math.sin(fox.ph)) / 2; p = mix(P.ramasse, P.etire, kk); }
+      else { fox.ph += dt * 9; const S = Math.sin(fox.ph); p = add(P.debout, { a: [0, 0, S * 11, -S * 11, -S * 10, S * 4, S * 4, S * 3, 0] }); }
+    } else if (air){ p = P.saut; fox.x += (tx - fox.x) * Math.min(1, dt * 3); }
+    else {
+      fox.dir = dir; const w = Math.sin(t * 14);
+      p = add(P.etirement, { a: [0, 0, 0, 0, 0, w * 10, w * 14, w * 12, w * 8] });      // position de jeu, la queue qui frétille
+      const headY = fox.y - 150 * s, high = FLOOR - toy.by;
+      if (A.cool <= 0 && toy.by > headY - 260 * s && fox.actT > .25){ fox.vh = Math.sqrt(2 * 2600 * s * Math.max(60 * s, Math.min(high - 60 * s, 300 * s))); A.cool = 1.1; }
+    }
+    fox.happy = .8;
+    // attrapée ?
+    const sn = snout(); if (sn && Math.hypot(sn[0] - toy.bx, sn[1] - toy.by) < 55 * s && A.cool > .4){
+      for (let i = 0; i < 3; i++) heart(toy.bx + rnd(-20, 20) * s, toy.by - 20 * s);
+      toy.vx += (Math.random() < .5 ? -1 : 1) * rnd(500, 900) * s; toy.vy -= rnd(400, 700) * s; A.cool = .3; fox.mouth = 1; }
+    if (!toy.on){ fox.h = Math.max(0, fox.h); next(); }
+  }
   return p;
+}
+const toy = { on: false, hx: 0, hy: 0, bx: 0, by: 0, vx: 0, vy: 0, idle: 0 };
+function updateToy(dt){
+  if (!toy.on) return;
+  const L = 120 * s + 30;                                   // longueur de la ficelle
+  toy.vy += 1500 * s * dt; toy.vx *= Math.pow(.6, dt); toy.vy *= Math.pow(.75, dt);
+  toy.bx += toy.vx * dt; toy.by += toy.vy * dt;
+  const dx = toy.bx - toy.hx, dy = toy.by - toy.hy, d = Math.hypot(dx, dy);
+  if (d > L){ const nx = dx / d, ny = dy / d; toy.bx = toy.hx + nx * L; toy.by = toy.hy + ny * L; const vn = toy.vx * nx + toy.vy * ny; if (vn > 0){ toy.vx -= vn * nx; toy.vy -= vn * ny; } }
+  const fl = FLOOR - 8 * s; if (toy.by > fl){ toy.by = fl; toy.vy *= -.3; toy.vx *= .9; }
+  toy.bx = clamp(toy.bx, 6, W - 6);
+}
+function setToy(on){ toy.on = on; toy.idle = 0; document.body.classList.toggle('toy', on); document.getElementById('bToy').classList.toggle('on', on);
+  if (on){ toy.hx = mouseIn ? mx : W / 2; toy.hy = mouseIn ? my : 20; toy.bx = toy.hx; toy.by = toy.hy + 60; toy.vx = toy.vy = 0; } }
+function snout(){ if (!fox.G) return null; const q = apply(fox.G.M[1], 196, 626); return [fox.x + fox.dir * s * (q[0] - O[0]), fox.y + s * (q[1] - O[1])]; }
+function drawToy(){
+  if (!toy.on) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.lineCap = ctx.lineJoin = 'round';
+  const sx = toy.hx - 34 * s - 8, sy = toy.hy - 34 * s - 8;          // la baguette part en haut à gauche de la souris
+  const mxp = (toy.hx + toy.bx) / 2, myp = Math.max(toy.hy, toy.by) + 18 * s;   // ficelle un peu molle
+  const stick = () => { ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(toy.hx, toy.hy); }, rope = () => { ctx.beginPath(); ctx.moveTo(toy.hx, toy.hy); ctx.quadraticCurveTo(mxp, myp, toy.bx, toy.by); };
+  const rb = Math.max(6, 16 * s);
+  ctx.strokeStyle = STK(); ctx.lineWidth = Math.max(6, 22 * s); stick(); ctx.stroke(); ctx.lineWidth = Math.max(5, 16 * s); rope(); ctx.stroke();
+  ctx.fillStyle = STK(); ctx.beginPath(); ctx.arc(toy.bx, toy.by, rb + Math.max(3, 10 * s), 0, 7); ctx.fill();
+  ctx.strokeStyle = ACC; ctx.lineWidth = Math.max(2, 6 * s); stick(); ctx.stroke(); ctx.lineWidth = Math.max(1.2, 3 * s); rope(); ctx.stroke();
+  ctx.lineWidth = Math.max(1.6, 5 * s); ctx.beginPath(); ctx.arc(toy.bx, toy.by, rb, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(toy.bx, toy.by, rb * .55, -2.4, -1.2); ctx.stroke();
 }
 function heart(x, y){ hearts.push({ x, y, t: 0, s: rnd(.7, 1.1), a: rnd(-1, 1) }); }
 
@@ -294,16 +358,21 @@ function update(dt, t){
   fox.actT += dt; fox.happy = Math.max(0, fox.happy - dt * 2); fox.sleepy = Math.max(0, fox.sleepy - dt * 2); fox.tongue = Math.max(0, fox.tongue - dt * 4); fox.mouth = Math.max(0, fox.mouth - dt * 3);
   const A = fox.act;
   const hungry = treats.some(tr => tr.landed && !tr.gone);
-  if (t - fox.petAt < .3 && !hungry && !dragging && !['caresse', 'quitte', 'mange'].includes(A.k)){
+  if (toy.on && mouseIn && !hungry && !['joue', 'quitte', 'mange'].includes(A.k) && !(A.k === 'galop' && A.then)){
+    if (fox.home){ fox.act = { k: 'quitte', x1: clamp(toy.bx + 300 * s, W * .15, W * .85), fly: .85, then: { k: 'joue' } }; fox.actT = 0; }
+    else start('joue');
+  }
+  if (t - fox.petAt < .3 && !toy.on && !hungry && !dragging && !['caresse', 'quitte', 'mange'].includes(A.k)){
     const keep = { allonge: 'allonge', dodo: 'dodo', toilette: 'allonge', logo: 'logo', assis: 'face' }[A.k];
     fox.base = keep || 'face'; if (!keep) fox.vh = 300 * s;
     fox.act = { k: 'caresse', back: keep ? A : null }; fox.actT = 0;
   }
   const tgt = targetPose(t, dt);
-  const fast = ['galop', 'queue', 'caresse', 'saut'].includes(fox.act.k);
+  const fast = ['galop', 'queue', 'caresse', 'saut', 'joue'].includes(fox.act.k);
   const swap = (!!tgt.front) !== (fox.front > .5);
   if (swap && fox.h <= 0 && !fox.home) fox.vh = Math.max(fox.vh, 420 * s);      // petit bond pour changer de position
   blendTo(tgt, Math.min(1, dt * (swap || Math.abs(fox.front - (tgt.front ? 1 : 0)) > .02 ? 22 : fast ? 14 : 7)));
+  updateToy(dt);
   if (fox.act.k !== 'galop'){ fox.vh -= 2600 * s * dt; fox.h = Math.max(0, fox.h + fox.vh * dt); if (fox.h <= 0) fox.vh = Math.max(0, fox.vh); }
   const M = fox.Mnow; const G = geom(M, fox.front > .5); fox.G = G;
   const gy = alignedY(G.maxY) - fox.h, Ak = fox.act;
@@ -368,6 +437,7 @@ function draw(t){
   else for (const sm of RIG.smile) ctx.fill(closedPath(partPoints({ p: sm.p, b: 1 }, G.M)));
   if (fox.tongue > .05){ const a = apply(Mh, MOUTH[0] - 10, MOUTH[1] + 8), b = apply(Mh, MOUTH[0] - 18 - fox.tongue * 8, MOUTH[1] + 16 + fox.tongue * 16); ctx.lineWidth = 12; ctx.strokeStyle = ACC; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
   for (const tr of treats) drawTreat(tr.x, tr.y, 1 - (tr.bite || 0) * .85);
+  drawToy();
   for (const c of crumbs){ ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = ACC; ctx.globalAlpha = 1 - c.t / .8; ctx.fillRect(c.x - 2, c.y - 2, 4, 4); ctx.globalAlpha = 1; }
   for (const h of hearts) drawIcon(HEART, h.x, h.y, s * 4.2 * h.s, Math.min(1, (1.5 - h.t) * 2));
   for (const z of zs) drawIcon(ZED, z.x, z.y, s * (3.2 + z.t * .8), Math.min(1, z.t * 2, (2.6 - z.t) * 1.5));
@@ -395,20 +465,27 @@ function zoneAt(x, y){
 }
 addEventListener('pointermove', e => {
   const nx = e.clientX, ny = e.clientY, z = zoneAt(nx, ny), now = (performance.now() - T0) / 1000;
-  cv.style.cursor = z ? 'grab' : 'default';
-  if (z && !dragging && mouseIn && Math.hypot(nx - mx, ny - my) > 1.5){
+  cv.style.cursor = toy.on ? 'none' : z ? 'grab' : 'default';
+  if (z && !toy.on && !dragging && mouseIn && Math.hypot(nx - mx, ny - my) > 1.5){
     fox.petZone = z; fox.petAt = now; fox.pet += Math.hypot(nx - mx, ny - my);
     if (fox.pet > 70){ fox.pet = 0; if (z === 'corps' || fox.sleepy > .3) purrs.push({ x: nx + rnd(-10, 10), y: ny - 10, t: 0 }); else heart(nx + rnd(-12, 12), ny - 14); }
   }
+  if (toy.on){ toy.hx = nx; toy.hy = ny; toy.idle = 0; }
   mx = nx; my = ny; mouseIn = true;
 }, { passive: true });
 document.addEventListener('mouseleave', () => { mouseIn = false; });
 addEventListener('pointerdown', e => {
-  if (e.target !== cv) return; const z = zoneAt(e.clientX, e.clientY); if (!z) return;
+  if (e.target !== cv || toy.on) return; const z = zoneAt(e.clientX, e.clientY); if (!z) return;
   for (let i = 0; i < 3; i++) heart(e.clientX + rnd(-20, 20), e.clientY - 10);
   if (fox.act.k !== 'dodo' && !fox.home && fox.h <= 0) fox.vh = 520 * s;
 });
 // ---------- boutons ----------
+// jouet : on le tient tant que le clic reste appuyé, il disparaît dès qu'on lâche
+const bY = document.getElementById('bToy');
+bY.addEventListener('pointerdown', e => { e.preventDefault(); bY.setPointerCapture(e.pointerId); mx = e.clientX; my = e.clientY; mouseIn = true; setToy(true); });
+const toyOff = () => setToy(false);
+bY.addEventListener('pointerup', toyOff); bY.addEventListener('pointercancel', toyOff); bY.addEventListener('lostpointercapture', toyOff);
+addEventListener('keydown', e => { if (e.key === 'Escape') setToy(false); });
 document.getElementById('bTheme').onclick = () => { mode = mode === 'dark' ? 'light' : 'dark'; store.set('fougue_theme', mode); applyUI(); };
 document.getElementById('bColor').onclick = () => { colorIx = (colorIx + 1) % COLORS.length; ACC = COLORS[colorIx]; store.set('fougue_color', colorIx); applyUI(); };
 let dragging = false;
