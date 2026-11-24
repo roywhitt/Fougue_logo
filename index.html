@@ -203,7 +203,8 @@ function weights(E){ return {
   dodo: E < .3 ? 9 * (.3 - E) / .3 : 0 }; }
 function pickAct(){
   const w = weights(energy()); if (fox.last) w[fox.last] = (w[fox.last] || 0) * .12;
-  if (fox.home) w.logo = 0; else if (fox.sinceLogo >= 3 && energy() > .1) return 'logo';
+  w.logo = 0;                                             // le retour au logo se fait au temps, pas au hasard
+  if (!fox.home && energy() > .1 && fox.offFor > (fox.offGoal || 50)) return 'logo';
   let t = 0; for (const k in w) t += w[k]; let r = Math.random() * t; for (const k in w){ r -= w[k]; if (r <= 0) return k; } return 'regarde';
 }
 const spd = () => lerp(.62, 1.1, energy());
@@ -215,19 +216,20 @@ function range(dir){
 function start(name, opt = {}){
   const A = { k: name, ...opt };
   if (fox.home && name !== 'logo' && name !== 'caresse'){ fox.act = { k: 'quitte', then: A, x1: clamp(fox.x + (Math.random() < .5 ? -1 : 1) * rnd(200, 360) * s, W * .2, W * .8), fly: .85 }; fox.actT = 0; return; }
+  if (name === 'logo') fox.offGoal = rnd(40, 70) * lerp(1.3, 1, energy());
   fox.act = A; fox.actT = 0; fox.stuck = 0; if (!opt.then && name !== 'caresse'){ fox.last = name; fox.sinceLogo = name === 'logo' ? 0 : (fox.sinceLogo || 0) + 1; }
   switch (name){
-    case 'galop': A.to = A.to ?? (fox.x < W / 2 ? rnd(W * .6, W) : rnd(0, W * .4)); A.d = 99; break;
-    case 'marche': A.to = A.to ?? rnd(0, W); A.d = 99; break;
+    case 'galop': A.to = A.to ?? (fox.x < W / 2 ? rnd(W * .75, W) : rnd(0, W * .25)); A.d = 99; if (!opt.then && Math.random() < .5) A.then = { k: 'galop', then: Math.random() < .5 ? { k: 'regarde' } : null }; break;
+    case 'marche': A.to = A.to ?? (fox.x < W / 2 ? rnd(W * .55, W) : rnd(0, W * .45)); A.d = 99; break;
     case 'renifle': A.to = fox.x + (Math.random() < .5 ? -1 : 1) * rnd(140, 280) * s; A.d = 99; break;
-    case 'logo': A.d = rnd(4, 8); A.x0 = fox.x; A.y0 = fox.y; A.fly = .95; break;
+    case 'logo': A.d = rnd(12, 20); fox.offAt = null; A.x0 = fox.x; A.y0 = fox.y; A.fly = .95; break;
     case 'saut': A.d = rnd(2, 3.4); break;
     case 'queue': A.d = rnd(1.6, 2.6); break;
     case 'etirement': A.d = 2.6; break;
-    case 'regarde': A.d = A.d ?? rnd(4, 8); break;
-    case 'assis': A.d = rnd(6, 12); fox.vh = 380 * s; break;
-    case 'toilette': A.d = A.d ?? rnd(5, 9); break;
-    case 'allonge': A.d = rnd(8, 16); break;
+    case 'regarde': A.d = A.d ?? rnd(6, 12); break;
+    case 'assis': A.d = rnd(10, 18); fox.vh = 380 * s; break;
+    case 'toilette': A.d = A.d ?? rnd(7, 12); break;
+    case 'allonge': A.d = rnd(16, 30); break;
     case 'dodo': A.d = rnd(25, 60); break;
     case 'mange': A.d = 3.2; break;
     case 'caresse': A.d = 99; break;
@@ -297,7 +299,7 @@ function targetPose(t, dt){
     fox.happy = z === 'queue' ? .5 : 1; if (b === 'dodo') fox.sleepy = 1;
     if (t - fox.petAt > 1.4){ const bk = A.back; if (treats.some(t => t.landed && !t.gone)) next(); else if (bk){ fox.act = bk; } else start('assis'); }
   } else if (k === 'logo'){
-    p = add(P.logo, { a: [0, 0, 0, 0, 0, sway * .4, Math.sin(t * 1.3 + .5) * 3, Math.sin(t * 1.3 + 1) * 3, Math.sin(t * 1.3 + 1.5) * 3] });
+    const wl = t * 2.3; p = add(P.logo, { a: [0, 0, 0, 0, 0, Math.sin(wl) * 3.5, Math.sin(wl - .6) * 6.5, Math.sin(wl - 1.2) * 8, Math.sin(wl - 1.8) * 8] });
     if (fox.actT >= A.d) start('regarde', { d: .1 });
   } else if (k === 'quitte'){ p = fox.actT < A.fly * .5 ? P.saut : P.debout; }
   else if (k === 'joue'){
@@ -357,6 +359,7 @@ function heart(x, y){ hearts.push({ x, y, t: 0, s: rnd(.7, 1.1), a: rnd(-1, 1) }
 // ================= boucle =================
 let mx = -999, my = -999, mouseIn = false, lastT = performance.now(), T0 = lastT;
 function update(dt, t){
+  if (!fox.home && fox.act.k !== 'logo') fox.offFor = (fox.offFor || 0) + dt; else fox.offFor = 0;
   fox.actT += dt; fox.happy = Math.max(0, fox.happy - dt * 2); fox.sleepy = Math.max(0, fox.sleepy - dt * 2); fox.tongue = Math.max(0, fox.tongue - dt * 4); fox.mouth = Math.max(0, fox.mouth - dt * 3);
   const A = fox.act;
   const hungry = treats.some(tr => tr.landed && !tr.gone);
