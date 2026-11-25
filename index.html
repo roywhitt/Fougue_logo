@@ -219,6 +219,11 @@ function range(dir){
 }
 function start(name, opt = {}){
   if (name === 'dodo'){ name = 'logo'; opt = { ...opt, k: 'logo', sleep: true }; }   // il ne dort plus devant le logo : il dort dessus
+  if (name === 'logo' && !opt.ready && !fox.home){      // retour au logo : il court d'abord jusqu'au pied du logo, puis il saute dessus
+    const tx = opt.sleep ? SLEEP[0] : HOME[0];
+    if (Math.abs(fox.x - tx) > 90 * s){ start('galop', { to: tx, then: { ...opt, k: 'logo', ready: true } }); return; }
+    opt = { ...opt, ready: true };
+  }
   const A = { k: name, ...opt };
   if (fox.home && name !== 'logo' && name !== 'caresse'){ fox.act = { k: 'quitte', then: A, x1: clamp(fox.x + (Math.random() < .5 ? -1 : 1) * rnd(200, 360) * s, W * .2, W * .8), fly: .85 }; fox.actT = 0; return; }
   if (name === 'logo') fox.offGoal = rnd(40, 70) * lerp(1.3, 1, energy());
@@ -227,7 +232,7 @@ function start(name, opt = {}){
     case 'galop': A.to = A.to ?? (fox.x < W / 2 ? rnd(W * .75, W) : rnd(0, W * .25)); A.d = 99; if (!opt.then && Math.random() < .5) A.then = { k: 'galop', then: Math.random() < .5 ? { k: 'regarde' } : null }; break;
     case 'marche': A.to = A.to ?? (fox.x < W / 2 ? rnd(W * .55, W) : rnd(0, W * .45)); A.d = 99; break;
     case 'renifle': A.to = fox.x + (Math.random() < .5 ? -1 : 1) * rnd(140, 280) * s; A.d = 99; break;
-    case 'logo': A.d = A.sleep ? rnd(25, 60) : rnd(12, 20); fox.offAt = null; A.x0 = fox.x; A.y0 = fox.y; A.fly = .95; break;
+    case 'logo': A.d = A.sleep ? rnd(25, 60) : rnd(12, 20); fox.offAt = null; A.x0 = fox.x; A.y0 = fox.y; A.d0 = fox.dir; A.fly = A.sleep ? 1.15 : .95; break;
     case 'saut': A.d = rnd(2, 3.4); break;
     case 'queue': A.d = rnd(1.6, 2.6); break;
     case 'etirement': A.d = 2.6; break;
@@ -304,7 +309,8 @@ function targetPose(t, dt){
     fox.happy = z === 'queue' ? .5 : 1; if (b === 'dodo' || (fox.act.back && fox.act.back.sleep)) fox.sleepy = 1;
     if (t - fox.petAt > 1.4){ const bk = A.back; if (treats.some(t => t.landed && !t.gone)) next(); else if (bk){ fox.act = bk; } else start('assis'); }
   } else if (k === 'logo'){
-    if (A.sleep){
+    if (A.fly && !fox.home) p = P.saut;                      // en l'air : il bondit sur le logo
+    else if (A.sleep){
       // il dort couché à plat, à l'horizontale, sur toute la longueur du texte, au-dessus des lettres
       const br = Math.sin(t * 1.2); p = add(P.dodo, { a: [br * 1.2, br * 1.5, 0, 0, 0, br, br, br * .6, 0] });
       if (fox.home){ fox.sleepy = 1;
@@ -397,7 +403,7 @@ function update(dt, t){
   if (atLogo){
     const L = Ak.k === 'logo' ? Ak : Ak.back, k = clamp(L.fly ? fox.actT / L.fly : 1, 0, 1);
     const TG = L.sleep ? SLEEP : HOME;
-    if (Ak.k === 'logo' && k < 1){ const e = k * k * (3 - 2 * k); fox.x = lerp(L.x0, TG[0], e); fox.y = lerp(L.y0, TG[1], e) - Math.sin(k * Math.PI) * 120 * s; fox.dir = 1; }
+    if (Ak.k === 'logo' && k < 1){ const e = k * k * (3 - 2 * k); fox.x = lerp(L.x0, TG[0], e); fox.y = lerp(L.y0, TG[1], e) - Math.sin(k * Math.PI) * (120 * s + .3 * Math.abs(L.y0 - TG[1])); fox.dir = k < .55 && L.d0 !== undefined ? L.d0 : 1; }   // il se retourne en l'air
     else { fox.x = TG[0]; fox.y = TG[1] + Math.sin(t * 1.6) * 1.5 * s; fox.dir = 1; fox.home = true; L.fly = 0; }
   } else if (Ak.k === 'quitte'){
     const k = clamp(fox.actT / Ak.fly, 0, 1), e = k * k * (3 - 2 * k);
