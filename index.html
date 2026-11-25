@@ -132,7 +132,7 @@ const P = {
   ramasse: { rot: 16,  a: [0,-16,-62,-56,72,-10,0,0,0] },
   etire:   { rot: 10,  a: [0,-10,0,4,-4,-6,0,0,0] },
   allonge: { rot: 12,  a: [0,-12,22,24,-4,2,4,4,2] },
-  dodo:    { rot: 12,  a: [0,6,24,26,-4,5,3,2,0] },
+  dodo:    { rot: 2,   a: [0,-10,-150,-154,-4,20,26,26,18] },   // couché en boule tranquille : pattes repliées sous le corps, tête posée, queue enroulée
   etirement:{ rot: -8, a: [0,8,26,30,60,-14,-6,0,0] },
   renifle: { rot: 10,  a: [0,-4,-38,-34,62,-6,2,2,2] },
   mange:   { rot: 2,   a: [0,10,-34,-30,66,-6,0,0,0] },
@@ -144,7 +144,7 @@ const add = (A, d) => ({ hs: A.hs || 1, rot: A.rot + (d.rot || 0), a: A.a.map((v
 const matsOf = pose => pose.front ? frontMats(pose.front) : profileMats(pose.a.map(v => v * D), pose.rot * D, pose.hs || 1);
 
 // ================= mise en page =================
-let POSE_H = 0, W = 0, H = 0, dpr = 1, s = 1, Lx = 0, Ly = 0, FLOOR = 0, HOME = [0, 0];
+let POSE_H = 0, W = 0, H = 0, dpr = 1, s = 1, Lx = 0, Ly = 0, FLOOR = 0, HOME = [0, 0], SLEEP = [0, 0];
 const FM = 44, LWD = RIG.LW;
 const PART = Object.fromEntries(RIG.parts.map(p => [p.n, p]));
 const ORDER_P = ['hind','legB','legA','tail','tip','body','head'], ORDER_F = ['tail','tip','FBODY','legB','legA','head'];
@@ -173,7 +173,11 @@ function layout(){
   Lx = ALIGN === 'left' ? 4 - COMP[0] * s : (W - cw * s) / 2 - COMP[0] * s;
   HOME = [Lx + O[0] * s, Ly + O[1] * s];
   FLOOR = H - 2 - FM * s;
+  // spot de sommeil : couché à plat, centré sur toute la longueur du texte « fougue », juste au-dessus des lettres
+  { const g = geom(matsOf(P.dodo), false); let by = -1e9; for (const n of ['hind','legB','legA','body','head']){ const a = g.pts[n]; for (let i = 1; i < a.length; i += 2) by = Math.max(by, a[i]); }   // le bas du corps compte, pas la queue
+  SLEEP = [Lx + s * SLEEP_CX - s * ((g.minX + g.maxX) / 2 - O[0]), Ly + s * SLEEP_BOTTOM - s * (by - O[1])]; }
 }
+const SLEEP_CX = 665, SLEEP_BOTTOM = 702;   // repère du logo : centre du texte, et haut des lettres
 const WS = new Path2D(); RIG.wsticker.forEach(c => { WS.moveTo(c[0], c[1]); for (let i = 2; i < c.length; i += 2) WS.lineTo(c[i], c[i+1]); WS.closePath(); });
 const WL = new Path2D(); RIG.letters.forEach(c => { WL.moveTo(c[0], c[1]); for (let i = 2; i < c.length; i += 2) WL.lineTo(c[i], c[i+1]); WL.closePath(); });
 
@@ -214,6 +218,7 @@ function range(dir){
   return [FM * s + 4 + l * s, W - FM * s - 4 - r * s];
 }
 function start(name, opt = {}){
+  if (name === 'dodo'){ name = 'logo'; opt = { ...opt, k: 'logo', sleep: true }; }   // il ne dort plus devant le logo : il dort dessus
   const A = { k: name, ...opt };
   if (fox.home && name !== 'logo' && name !== 'caresse'){ fox.act = { k: 'quitte', then: A, x1: clamp(fox.x + (Math.random() < .5 ? -1 : 1) * rnd(200, 360) * s, W * .2, W * .8), fly: .85 }; fox.actT = 0; return; }
   if (name === 'logo') fox.offGoal = rnd(40, 70) * lerp(1.3, 1, energy());
@@ -222,7 +227,7 @@ function start(name, opt = {}){
     case 'galop': A.to = A.to ?? (fox.x < W / 2 ? rnd(W * .75, W) : rnd(0, W * .25)); A.d = 99; if (!opt.then && Math.random() < .5) A.then = { k: 'galop', then: Math.random() < .5 ? { k: 'regarde' } : null }; break;
     case 'marche': A.to = A.to ?? (fox.x < W / 2 ? rnd(W * .55, W) : rnd(0, W * .45)); A.d = 99; break;
     case 'renifle': A.to = fox.x + (Math.random() < .5 ? -1 : 1) * rnd(140, 280) * s; A.d = 99; break;
-    case 'logo': A.d = rnd(12, 20); fox.offAt = null; A.x0 = fox.x; A.y0 = fox.y; A.fly = .95; break;
+    case 'logo': A.d = A.sleep ? rnd(25, 60) : rnd(12, 20); fox.offAt = null; A.x0 = fox.x; A.y0 = fox.y; A.fly = .95; break;
     case 'saut': A.d = rnd(2, 3.4); break;
     case 'queue': A.d = rnd(1.6, 2.6); break;
     case 'etirement': A.d = 2.6; break;
@@ -286,7 +291,7 @@ function targetPose(t, dt){
     fox.dir = A.dir; const c = Math.abs(Math.sin(t * 9));
     p = add(P.mange, { a: [0, c * 7, 0, 0, 0, Math.sin(t * 5) * 6, Math.sin(t * 5 + 1) * 6, 0, 0] }); fox.mouth = c * .7; fox.happy = .4;
     if (A.tr){ A.tr.bite = clamp(fox.actT / A.d, 0, 1); if (Math.random() < dt * 10) crumbs.push({ x: A.tr.x + rnd(-14, 14) * s, y: FLOOR - rnd(4, 20) * s, vx: rnd(-80, 80) * s, vy: rnd(-260, -80) * s, t: 0 }); }
-    if (fox.actT >= A.d){ if (A.tr) A.tr.gone = true; for (let i = 0; i < 4; i++) heart(fox.x - fox.dir * 300 * s + rnd(-30, 30) * s, fox.y - 160 * s); start('toilette', { d: 3, then: { k: 'assis' } }); }
+    if (fox.actT >= A.d){ if (A.tr) A.tr.gone = true; for (let i = 0; i < 4; i++) heart(fox.x - fox.dir * 300 * s + rnd(-30, 30) * s, fox.y - 160 * s); start('toilette', { d: 3, then: { k: 'logo', sleep: true } }); }
   } else if (k === 'caresse'){
     const z = fox.petZone, b = fox.base;
     if (b === 'face') p = FACE({ tilt: z === 'tete' ? Math.sin(t * 3.2) * 9 : Math.sin(t * 1.5) * 3, tail: z === 'queue' ? [Math.sin(t * 19) * 10, Math.sin(t * 19 + 1) * 18, Math.sin(t * 19 + 2) * 18, Math.sin(t * 19 + 3) * 12] : [Math.sin(t * 6) * 8, 8, 8, 6], bob: z === 'corps' ? Math.sin(t * 2.4) * 5 : 0 });
@@ -296,11 +301,18 @@ function targetPose(t, dt){
       if (z === 'corps') p = add(p, { rot: Math.sin(t * 2.4) * 2, a: [0, 0, 0, 0, 0, Math.sin(t * 3) * 8, Math.sin(t * 3 + 1) * 8, Math.sin(t * 3 + 2) * 6, 0] });
       if (z === 'queue') p = add(p, { a: [0, 0, 0, 0, 0, Math.sin(t * 19) * 10, Math.sin(t * 19 + 1) * 18, Math.sin(t * 19 + 2) * 18, Math.sin(t * 19 + 3) * 14] });
     }
-    fox.happy = z === 'queue' ? .5 : 1; if (b === 'dodo') fox.sleepy = 1;
+    fox.happy = z === 'queue' ? .5 : 1; if (b === 'dodo' || (fox.act.back && fox.act.back.sleep)) fox.sleepy = 1;
     if (t - fox.petAt > 1.4){ const bk = A.back; if (treats.some(t => t.landed && !t.gone)) next(); else if (bk){ fox.act = bk; } else start('assis'); }
   } else if (k === 'logo'){
-    const wl = t * 2.3; p = add(P.logo, { a: [0, 0, 0, 0, 0, Math.sin(wl) * 3.5, Math.sin(wl - .6) * 6.5, Math.sin(wl - 1.2) * 8, Math.sin(wl - 1.8) * 8] });
-    if (fox.actT >= A.d) start('regarde', { d: .1 });
+    if (A.sleep){
+      // il dort couché à plat, à l'horizontale, sur toute la longueur du texte, au-dessus des lettres
+      const br = Math.sin(t * 1.2); p = add(P.dodo, { a: [br * 1.2, br * 1.5, 0, 0, 0, br, br, br * .6, 0] });
+      if (fox.home){ fox.sleepy = 1;
+        if (Math.random() < dt * .45){ const hq = apply(fox.G.M[1], 300, 500); zs.push({ x: fox.x + s * (hq[0] - O[0]) - 10 * s, y: fox.y + s * (hq[1] - O[1]) - 60 * s, t: 0 }); } }
+    } else {
+      const wl = t * 2.3; p = add(P.logo, { a: [0, 0, 0, 0, 0, Math.sin(wl) * 3.5, Math.sin(wl - .6) * 6.5, Math.sin(wl - 1.2) * 8, Math.sin(wl - 1.8) * 8] });
+    }
+    if (fox.actT >= A.d){ if (A.sleep) start('etirement'); else start('regarde', { d: .1 }); }   // au réveil il s'étire avant de repartir
   } else if (k === 'quitte'){ p = fox.actT < A.fly * .5 ? P.saut : P.debout; }
   else if (k === 'joue'){
     // il suit la balle, se met en position de jeu quand elle est proche, et bondit pour l'attraper
@@ -323,7 +335,7 @@ function targetPose(t, dt){
     const sn = snout(); if (sn && Math.hypot(sn[0] - toy.bx, sn[1] - toy.by) < 55 * s && A.cool > .4){
       for (let i = 0; i < 3; i++) heart(toy.bx + rnd(-20, 20) * s, toy.by - 20 * s);
       toy.vx += (Math.random() < .5 ? -1 : 1) * rnd(500, 900) * s; toy.vy -= rnd(400, 700) * s; A.cool = .3; fox.mouth = 1; }
-    if (!toy.on){ fox.h = Math.max(0, fox.h); next(); }
+    if (!toy.on){ fox.h = Math.max(0, fox.h); if (treats.some(tr => tr.landed && !tr.gone)) next(); else start('logo', { sleep: true }); }   // fin du jeu : il retourne s'allonger sur le logo
   }
   return p;
 }
@@ -368,7 +380,7 @@ function update(dt, t){
     else start('joue');
   }
   if (t - fox.petAt < .3 && !toy.on && !hungry && !dragging && !['caresse', 'quitte', 'mange'].includes(A.k)){
-    const keep = { allonge: 'allonge', dodo: 'dodo', toilette: 'allonge', logo: 'logo', assis: 'face' }[A.k];
+    const keep = (A.k === 'logo' && A.sleep) ? 'dodo' : { allonge: 'allonge', dodo: 'dodo', toilette: 'allonge', logo: 'logo', assis: 'face' }[A.k];
     fox.base = keep || 'face'; if (!keep) fox.vh = 300 * s;
     fox.act = { k: 'caresse', back: keep ? A : null }; fox.actT = 0;
   }
@@ -384,11 +396,13 @@ function update(dt, t){
   const atLogo = Ak.k === 'logo' || (Ak.k === 'caresse' && Ak.back && Ak.back.k === 'logo');
   if (atLogo){
     const L = Ak.k === 'logo' ? Ak : Ak.back, k = clamp(L.fly ? fox.actT / L.fly : 1, 0, 1);
-    if (Ak.k === 'logo' && k < 1){ const e = k * k * (3 - 2 * k); fox.x = lerp(L.x0, HOME[0], e); fox.y = lerp(L.y0, HOME[1], e) - Math.sin(k * Math.PI) * 120 * s; fox.dir = 1; }
-    else { fox.x = HOME[0]; fox.y = HOME[1] + Math.sin(t * 1.6) * 1.5 * s; fox.dir = 1; fox.home = true; L.fly = 0; }
+    const TG = L.sleep ? SLEEP : HOME;
+    if (Ak.k === 'logo' && k < 1){ const e = k * k * (3 - 2 * k); fox.x = lerp(L.x0, TG[0], e); fox.y = lerp(L.y0, TG[1], e) - Math.sin(k * Math.PI) * 120 * s; fox.dir = 1; }
+    else { fox.x = TG[0]; fox.y = TG[1] + Math.sin(t * 1.6) * 1.5 * s; fox.dir = 1; fox.home = true; L.fly = 0; }
   } else if (Ak.k === 'quitte'){
     const k = clamp(fox.actT / Ak.fly, 0, 1), e = k * k * (3 - 2 * k);
-    fox.x = lerp(HOME[0], Ak.x1, e); fox.y = lerp(HOME[1], gy, e) - Math.sin(k * Math.PI) * 90 * s; fox.dir = Ak.x1 < HOME[0] ? 1 : -1;
+    if (Ak.sx === undefined){ Ak.sx = fox.x; Ak.sy = fox.y; }      // il part de là où il se trouve (logo ou spot de sommeil)
+    fox.x = lerp(Ak.sx, Ak.x1, e); fox.y = lerp(Ak.sy, gy, e) - Math.sin(k * Math.PI) * 90 * s; fox.dir = Ak.x1 < Ak.sx ? 1 : -1;
     if (k >= 1){ fox.home = false; const th = Ak.then; fox.act = { k: 'regarde', d: .3 }; fox.actT = 0; if (th) start(th.k, th); else if (treats.some(tr => tr.landed && !tr.gone)) next(); }
   } else {
     fox.y = gy; fox.home = false;
@@ -522,7 +536,7 @@ function syncTreatBtn(){ const busy = treats.length > 0; if (bT.classList.contai
 function frame(now){ syncTreatBtn(); const dt = Math.min(.05, (now - lastT) / 1000); lastT = now; const t = (now - T0) / 1000; update(dt, t); draw(t); requestAnimationFrame(frame); }
 addEventListener('resize', layout);
 layout(); applyUI();
-if (energy() < .1){ setPoseNow(P.dodo); fox.x = rnd(W * .3, W * .7); start('dodo'); }
+if (energy() < .1){ setPoseNow(P.dodo); fox.x = SLEEP[0]; fox.y = SLEEP[1]; start('logo', { sleep: true }); fox.act.fly = 0; fox.act.d = rnd(40, 80); fox.last = 'logo'; }
 else { setPoseNow(P.logo); fox.x = HOME[0]; fox.y = HOME[1]; start('logo'); fox.act.fly = 0; fox.act.d = rnd(3, 6); fox.last = 'logo'; }
 { fox.Mnow = matsOf(fox.curP || P.logo); fox.G = geom(fox.Mnow, false); }
 requestAnimationFrame(frame);
